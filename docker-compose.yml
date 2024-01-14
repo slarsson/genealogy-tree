@@ -1,0 +1,29 @@
+version: '3.9'
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:15.0
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - '5432:5432'
+    networks:
+      - postgres
+    volumes:
+      - './_data:/var/lib/postgresql/data'
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4
+    ports:
+      - '8888:80'
+    networks:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: asdf@samuel.yoga
+      PGADMIN_DEFAULT_PASSWORD: postgres
+    volumes:
+      - './_pgadmin:/var/lib/pgadmin'
+networks:
+  postgres:
+    driver: bridge
