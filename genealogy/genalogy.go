@@ -15,6 +15,9 @@ type Service interface {
 	// Get all descendants
 	Descendants(ctx context.Context, nodeID string) ([]Node, error)
 
+	// Get first descendants of type
+	FirstDescendantsOfType(ctx context.Context, nodeID string, nodeType string) ([]Node, error)
+
 	// Get immediate ascendants/parents
 	Parents(ctx context.Context, nodeID string) ([]Node, error)
 
@@ -90,7 +93,7 @@ func (g *Genealogy) Children(ctx context.Context, nodeID string) ([]Node, error)
 		WHERE source_node_id = $1
 	`, g.tableName)
 
-	return g.queryNodes(ctx, nodeID, query)
+	return g.queryNodes(ctx, query, nodeID)
 }
 
 func (g *Genealogy) Descendants(ctx context.Context, nodeID string) ([]Node, error) {
@@ -108,7 +111,27 @@ func (g *Genealogy) Descendants(ctx context.Context, nodeID string) ([]Node, err
 		SELECT DISTINCT node_id, target_node_type FROM descendants
 	`, g.tableName, g.tableName)
 
-	return g.queryNodes(ctx, nodeID, query)
+	return g.queryNodes(ctx, query, nodeID)
+}
+
+func (g *Genealogy) FirstDescendantsOfType(ctx context.Context, nodeID string, nodeType string) ([]Node, error) {
+	query := fmt.Sprintf(`
+		WITH RECURSIVE descendants AS (
+			SELECT target_node_id AS node_id, target_node_type FROM %s
+			WHERE source_node_id = $1
+			
+			UNION ALL
+		
+			SELECT e.target_node_id, e.target_node_type
+			FROM descendants
+			JOIN %s AS e ON e.source_node_id = descendants.node_id
+			WHERE NOT e.source_node_type = $2
+		)
+		SELECT DISTINCT node_id, target_node_type FROM descendants
+		WHERE target_node_type = $2
+	`, g.tableName, g.tableName)
+
+	return g.queryNodes(ctx, query, nodeID, nodeType)
 }
 
 func (g *Genealogy) Parents(ctx context.Context, nodeID string) ([]Node, error) {
@@ -117,7 +140,7 @@ func (g *Genealogy) Parents(ctx context.Context, nodeID string) ([]Node, error) 
 		WHERE target_node_id = $1
 	`, g.tableName)
 
-	return g.queryNodes(ctx, nodeID, query)
+	return g.queryNodes(ctx, query, nodeID)
 }
 
 func (g *Genealogy) Ascendants(ctx context.Context, nodeID string) ([]Node, error) {
@@ -136,17 +159,17 @@ func (g *Genealogy) Ascendants(ctx context.Context, nodeID string) ([]Node, erro
 		SELECT DISTINCT node_id, source_node_type FROM ascendants
 	`, g.tableName, g.tableName)
 
-	return g.queryNodes(ctx, nodeID, query)
+	return g.queryNodes(ctx, query, nodeID)
 }
 
-func (g *Genealogy) queryNodes(ctx context.Context, nodeID string, query string) ([]Node, error) {
+func (g *Genealogy) queryNodes(ctx context.Context, query string, args ...any) ([]Node, error) {
 	stmt, err := g.db.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("prepare: %w", err)
 	}
 
 	defer stmt.Close()
-	rows, err := stmt.QueryContext(ctx, nodeID)
+	rows, err := stmt.QueryContext(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("queryContext: %w", err)
 	}
