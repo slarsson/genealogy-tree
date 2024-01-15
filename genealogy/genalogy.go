@@ -55,7 +55,7 @@ func New(pgConnectString string, tableName string) (*Genealogy, error) {
 	}, nil
 }
 
-func (g *Genealogy) AddEdge(ctx context.Context, source Node, target Node) error {
+func (g Genealogy) AddEdge(ctx context.Context, source Node, target Node) error {
 	query := fmt.Sprintf(`
 		INSERT INTO %s (source_node_id, source_node_type, target_node_id, target_node_type) 
 		VALUES ($1, $2, $3, $4)
@@ -71,7 +71,7 @@ func (g *Genealogy) AddEdge(ctx context.Context, source Node, target Node) error
 	return err
 }
 
-func (g *Genealogy) RemoveEdge(ctx context.Context, source Node, target Node) error {
+func (g Genealogy) RemoveEdge(ctx context.Context, source Node, target Node) error {
 	query := fmt.Sprintf(`
 		DELETE FROM %s
 		WHERE source_node_id = $1 AND source_node_type = $2 AND target_node_id = $3 AND target_node_type = $4
@@ -87,7 +87,7 @@ func (g *Genealogy) RemoveEdge(ctx context.Context, source Node, target Node) er
 	return err
 }
 
-func (g *Genealogy) Children(ctx context.Context, nodeID string) ([]Node, error) {
+func (g Genealogy) Children(ctx context.Context, nodeID string) ([]Node, error) {
 	query := fmt.Sprintf(`
 		SELECT target_node_id, target_node_type FROM %s
 		WHERE source_node_id = $1
@@ -96,45 +96,45 @@ func (g *Genealogy) Children(ctx context.Context, nodeID string) ([]Node, error)
 	return g.queryNodes(ctx, query, nodeID)
 }
 
-func (g *Genealogy) Descendants(ctx context.Context, nodeID string) ([]Node, error) {
+func (g Genealogy) Descendants(ctx context.Context, nodeID string) ([]Node, error) {
 	query := fmt.Sprintf(`
 		WITH RECURSIVE descendants AS (
 			SELECT target_node_id AS node_id, target_node_type FROM %s
 			WHERE source_node_id = $1
 			
-			UNION ALL
+			UNION
 		
 			SELECT e.target_node_id, e.target_node_type
 			FROM descendants
 			JOIN %s AS e ON e.source_node_id = descendants.node_id
 		)
-		SELECT DISTINCT node_id, target_node_type FROM descendants
+		SELECT node_id, target_node_type FROM descendants
 	`, g.tableName, g.tableName)
 
 	return g.queryNodes(ctx, query, nodeID)
 }
 
-func (g *Genealogy) FirstDescendantsOfType(ctx context.Context, nodeID string, nodeType string) ([]Node, error) {
+func (g Genealogy) FirstDescendantsOfType(ctx context.Context, nodeID string, nodeType string) ([]Node, error) {
 	query := fmt.Sprintf(`
 		WITH RECURSIVE descendants AS (
 			SELECT target_node_id AS node_id, target_node_type FROM %s
 			WHERE source_node_id = $1
 			
-			UNION ALL
+			UNION
 		
 			SELECT e.target_node_id, e.target_node_type
 			FROM descendants
 			JOIN %s AS e ON e.source_node_id = descendants.node_id
 			WHERE NOT e.source_node_type = $2
 		)
-		SELECT DISTINCT node_id, target_node_type FROM descendants
+		SELECT node_id, target_node_type FROM descendants
 		WHERE target_node_type = $2
 	`, g.tableName, g.tableName)
 
 	return g.queryNodes(ctx, query, nodeID, nodeType)
 }
 
-func (g *Genealogy) Parents(ctx context.Context, nodeID string) ([]Node, error) {
+func (g Genealogy) Parents(ctx context.Context, nodeID string) ([]Node, error) {
 	query := fmt.Sprintf(`
 		SELECT source_node_id, source_node_type FROM %s
 		WHERE target_node_id = $1
@@ -143,26 +143,25 @@ func (g *Genealogy) Parents(ctx context.Context, nodeID string) ([]Node, error) 
 	return g.queryNodes(ctx, query, nodeID)
 }
 
-func (g *Genealogy) Ascendants(ctx context.Context, nodeID string) ([]Node, error) {
-	// TODO: how to ignore duplicates during recursive?
+func (g Genealogy) Ascendants(ctx context.Context, nodeID string) ([]Node, error) {
 	query := fmt.Sprintf(`
 		WITH RECURSIVE ascendants AS (
 			SELECT source_node_id AS node_id, source_node_type FROM %s
 			WHERE target_node_id = $1
 			
-			UNION ALL
+			UNION
 		
 			SELECT e.source_node_id, e.source_node_type
 			FROM ascendants
 			JOIN %s AS e ON e.target_node_id = ascendants.node_id
 		)
-		SELECT DISTINCT node_id, source_node_type FROM ascendants
+		SELECT node_id, source_node_type FROM ascendants
 	`, g.tableName, g.tableName)
 
 	return g.queryNodes(ctx, query, nodeID)
 }
 
-func (g *Genealogy) queryNodes(ctx context.Context, query string, args ...any) ([]Node, error) {
+func (g Genealogy) queryNodes(ctx context.Context, query string, args ...any) ([]Node, error) {
 	stmt, err := g.db.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("prepare: %w", err)

@@ -34,8 +34,8 @@ func main() {
 		}
 	}
 
-	nodes, err := svc.FirstDescendantsOfType(ctx, p1, "J")
-	//nodes, err := svc.Descendants(ctx, p1)
+	//nodes, err := svc.FirstDescendantsOfType(ctx, p1, "J")
+	nodes, err := svc.Descendants(ctx, p1)
 	if err != nil {
 		log.Fatal(err)
 	}

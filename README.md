@@ -1,5 +1,3 @@
 # genealogy-tree
 
-psql -h localhost -p 5432 -U postgres
-
-https://builtin.com/data-science/recursive-sql
+Store and traverse genealogy trees using Postgres.
